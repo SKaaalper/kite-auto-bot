@@ -6,7 +6,6 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { createInterface } from "readline";
-import { SocksProxyAgent } from "socks-proxy-agent";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { HttpProxyAgent } from "http-proxy-agent";
 import axios from "axios";
@@ -25,6 +24,30 @@ const readline = createInterface({
 
 let totalInteractions = 0;
 let totalPoints = 0;
+const logFile = "interaction_logs.json";
+
+function saveInteractionLog(wallet, count) {
+  let logs = {};
+  if (fs.existsSync(logFile)) {
+    logs = JSON.parse(fs.readFileSync(logFile));
+  }
+  logs[wallet] = logs[wallet] || [];
+  logs[wallet].push({ date: new Date().toISOString(), count });
+  fs.writeFileSync(logFile, JSON.stringify(logs, null, 2));
+}
+
+function getHistoricalInteractions(wallet) {
+  if (!fs.existsSync(logFile)) return 0;
+  const logs = JSON.parse(fs.readFileSync(logFile));
+  if (!logs[wallet]) return 0;
+
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+  return logs[wallet]
+    .filter((log) => new Date(log.date) >= lastMonth)
+    .reduce((sum, log) => sum + log.count, 0);
+}
 
 function showBanner() {
   console.log(chalk.blue(`\n==========================================`));
@@ -53,13 +76,9 @@ function getCurrentTimestamp() {
 }
 
 function createAxiosInstance(proxyUrl = null) {
-  const config = { 
-    headers: { "Content-Type": "application/json" },
-    timeout: 15000 
-  };
+  const config = { headers: { "Content-Type": "application/json" }, timeout: 15000 };
   if (proxyUrl) {
-    const proxyAgent = new HttpsProxyAgent(proxyUrl);
-    config.httpsAgent = proxyAgent;
+    config.httpsAgent = new HttpsProxyAgent(proxyUrl);
     config.httpAgent = new HttpProxyAgent(proxyUrl);
   }
   return axios.create(config);
@@ -72,6 +91,8 @@ const fetchUserStats = async (wallet_address, innerAxios) => {
       totalInteractions = response.data.total_interactions;
       totalPoints = response.data.total_points;
     }
+    const historicalInteractions = getHistoricalInteractions(wallet_address);
+    console.log(chalk.blue(`📊 Total Interactions from last month: ${historicalInteractions}`));
   } catch (error) {
     console.log(chalk.red("⚠️ Error fetching user stats. Continuing..."));
   }
@@ -95,8 +116,6 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
       } catch (error) {
         if (error.response && [502, 504].includes(error.response.status)) {
           console.log(chalk.yellow(`⚠️ Received ${error.response.status} error. Retrying... (${attempts + 1}/${maxAttempts})`));
-        } else if (error.code === 'ECONNABORTED') {
-          console.log(chalk.yellow(`⚠️ Request timed out. Retrying... (${attempts + 1}/${maxAttempts})`));
         } else {
           throw error;
         }
@@ -110,6 +129,7 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
     if (response && response.status === 200) {
       totalInteractions++;
       totalPoints += Math.floor(Math.random() * 10) + 1;
+      saveInteractionLog(wallet_address, 1);
       console.log(chalk.green(`[${timestamp}] ✅ Message sent successfully`));
       console.log(chalk.yellow(`⏳ Request time: ${(endTime - startTime) / 1000}s`));
       console.log(chalk.blue(`📊 Total Interactions: ${totalInteractions} | Total Points Earned: ${totalPoints}`));
