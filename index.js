@@ -55,7 +55,7 @@ const retry = async (fn, { maxAttempts, delay }) => {
     } catch {
       attempt++;
       if (attempt >= maxAttempts) return false;
-      await sleep(delay * 1000);
+      await sleep(delay * 500); // Reduce delay for faster retry
     }
   }
 };
@@ -96,13 +96,14 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
     if (response.status === 200) {
       console.log(chalk.green("✅ Message sent successfully"));
     }
+    await sleep(1000); // Add fixed interval of 1 second between messages
   } catch (error) {
     console.error(chalk.red("⚠️ Error sending message:"), error);
   }
 };
 
 const main = async ({ wallet, innerAxios }) => {
-  const limit = plimit(1);
+  const limit = plimit(3); // Increase parallel requests
   const tasks = agents.map((item) => limit(() => sendMessage({ item, wallet_address: wallet, innerAxios })));
   await Promise.all(tasks);
 };
