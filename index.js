@@ -6,7 +6,6 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { createInterface } from "readline";
-import { SocksProxyAgent } from "socks-proxy-agent";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { HttpProxyAgent } from "http-proxy-agent";
 import axios from "axios";
@@ -46,8 +45,13 @@ const saveTotalInteractions = () => {
   fs.writeFileSync(logFilePath, JSON.stringify({ totalInteractions }, null, 2));
 };
 
-// Function to update dashboard stats
+// Function to update dashboard stats (MAKE SURE WALLET IS PASSED)
 const updateDashboard = async (wallet, totalInteractions, totalPoints, innerAxios) => {
+  if (!wallet) {
+    console.log(chalk.red("⚠️ Wallet address is missing. Skipping dashboard update."));
+    return;
+  }
+
   try {
     const response = await innerAxios.post("https://api.zettablock.com/update-stats", {
       wallet: wallet,
@@ -55,13 +59,8 @@ const updateDashboard = async (wallet, totalInteractions, totalPoints, innerAxio
       total_points: totalPoints,
     });
 
-    console.log("📤 Sending update:", {
-      wallet: wallet,
-      total_interactions: totalInteractions,
-      total_points: totalPoints,
-    });
-
-    console.log("📥 API Response:", response.data);
+    console.log(chalk.green(`📤 Updating dashboard for wallet: ${wallet}`));
+    console.log(chalk.blue(`📊 Total Interactions: ${totalInteractions} | Total Points: ${totalPoints}`));
 
     if (response.status === 200) {
       console.log(chalk.green("✅ Successfully updated dashboard!"));
@@ -76,7 +75,6 @@ const updateDashboard = async (wallet, totalInteractions, totalPoints, innerAxio
 function showBanner() {
   console.log(chalk.blue(`\n==========================================`));
   console.log(chalk.green(`=            Kite Ai Auto Bot            =`));
-  console.log(chalk.red(`=                                        =`));
   console.log(chalk.yellow(`=               Batang Eds               =`));
   console.log(chalk.blue(`==========================================\n`));
 }
@@ -107,6 +105,11 @@ function createAxiosInstance(proxyUrl = null) {
 }
 
 const sendMessage = async ({ item, wallet_address, innerAxios }) => {
+  if (!wallet_address) {
+    console.log(chalk.red("⚠️ Wallet address is missing! Skipping this request."));
+    return;
+  }
+
   try {
     const message = getRandomQuestion() || generate({ maxLength: 6 });
     const timestamp = getCurrentTimestamp();
@@ -119,7 +122,7 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
 
     while (attempts < maxAttempts) {
       try {
-        response = await innerAxios.post(item.url, { message, stream: true });
+        response = await innerAxios.post(item.url, { message, stream: true, wallet: wallet_address });
         if (response.status === 200) break;
       } catch (error) {
         if (error.response && [502, 504].includes(error.response.status)) {
@@ -146,7 +149,7 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
       console.log(chalk.yellow(`⏳ Request time: ${(endTime - startTime) / 1000}s`));
       console.log(chalk.blue(`📊 Total Interactions: ${totalInteractions} | Total Points Earned: ${totalPoints}`));
 
-      // 🔄 Update the dashboard API
+      // 🔄 Update the dashboard API with correct wallet
       await updateDashboard(wallet_address, totalInteractions, totalPoints, innerAxios);
     } else {
       console.log(chalk.red(`❌ Failed after ${maxAttempts} attempts. Moving to next message...`));
@@ -158,7 +161,13 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
 };
 
 const main = async ({ wallet, innerAxios }) => {
-  const limit = plimit(1);
+  if (!wallet) {
+    console.log(chalk.red("⚠️ No wallet address provided. Exiting."));
+    process.exit(1);
+  }
+
+  console.log(chalk.green(`🚀 Running bot for wallet: ${wallet}`));
+
   while (true) {
     for (const item of agents) {
       await sendMessage({ item, wallet_address: wallet, innerAxios });
@@ -169,6 +178,11 @@ const main = async ({ wallet, innerAxios }) => {
 const index = async () => {
   showBanner();
   readline.question(chalk.yellow("🔑 Enter wallet address: "), async (wallet) => {
+    if (!wallet) {
+      console.log(chalk.red("⚠️ Wallet address is required!"));
+      process.exit(1);
+    }
+
     const proxy = null;
     const innerAxios = createAxiosInstance(proxy);
     await main({ wallet, innerAxios });
