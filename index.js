@@ -55,7 +55,7 @@ const retry = async (fn, { maxAttempts, delay }) => {
     } catch {
       attempt++;
       if (attempt >= maxAttempts) return false;
-      await sleep(delay * 500); // Reduce delay for faster retry
+      await sleep(delay * 500);
     }
   }
 };
@@ -83,7 +83,10 @@ function loadProxiesFromFile() {
 }
 
 function createAxiosInstance(proxyUrl = null) {
-  const config = { headers: { "Content-Type": "application/json" } };
+  const config = { 
+    headers: { "Content-Type": "application/json" },
+    timeout: 10000 // 10s timeout to avoid hanging requests
+  };
   if (proxyUrl) {
     const proxyAgent = new HttpsProxyAgent(proxyUrl);
     config.httpsAgent = proxyAgent;
@@ -97,19 +100,46 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
     const message = getRandomQuestion() || generate({ maxLength: 6 });
     const timestamp = getCurrentTimestamp();
     console.log(chalk.cyan(`[${timestamp}] Sending message:`), message);
-    
-    const response = await innerAxios.post(item.url, { message, stream: true });
-    if (response.status === 200) {
-      console.log(chalk.green(`[${timestamp}] ✅ Message sent successfully`));
+
+    const startTime = Date.now();
+    let response;
+    let attempts = 0;
+    let maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        response = await innerAxios.post(item.url, { message, stream: true });
+        if (response.status === 200) break;
+      } catch (error) {
+        if (error.response && error.response.status === 502) {
+          console.log(chalk.yellow(`⚠️ Received 502 error. Retrying... (${attempts + 1}/${maxAttempts})`));
+          await sleep(2000);
+          attempts++;
+          continue;
+        } else {
+          throw error;
+        }
+      }
     }
-    await sleep(1000); // Add fixed interval of 1 second between messages
+
+    const endTime = Date.now();
+
+    if (response && response.status === 200) {
+      console.log(chalk.green(`[${timestamp}] ✅ Message sent successfully`));
+      console.log(chalk.yellow(`⏳ Request time: ${(endTime - startTime) / 1000}s`));
+    } else {
+      console.log(chalk.red(`❌ Failed after ${maxAttempts} attempts.`));
+    }
+
+    await sleep(1000);
+
   } catch (error) {
     console.error(chalk.red("⚠️ Error sending message:"), error);
   }
 };
 
 const main = async ({ wallet, innerAxios }) => {
-  const limit = plimit(3); // Increase parallel requests
+  const limit = plimit(1);
   const tasks = agents.map((item) => limit(() => sendMessage({ item, wallet_address: wallet, innerAxios })));
   await Promise.all(tasks);
 };
@@ -117,7 +147,7 @@ const main = async ({ wallet, innerAxios }) => {
 const index = async () => {
   showBanner();
   readline.question(chalk.yellow("🔑 Enter wallet address: "), async (wallet) => {
-    const proxy = proxyConfig.enabled ? loadProxiesFromFile() : null;
+    const proxy = null;
     const innerAxios = createAxiosInstance(proxy);
     await main({ wallet, innerAxios });
     readline.close();
