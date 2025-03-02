@@ -45,32 +45,8 @@ const agents = [
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const retry = async (fn, { maxAttempts, delay }) => {
-  let attempt = 0;
-  while (attempt < maxAttempts) {
-    try {
-      const result = await fn();
-      if (!result) throw new Error("Retrying...");
-      return result;
-    } catch {
-      attempt++;
-      if (attempt >= maxAttempts) return false;
-      await sleep(delay * 500);
-    }
-  }
-};
-
 function getCurrentTimestamp() {
   return new Date().toLocaleString();
-}
-
-function loadWalletsFromFile() {
-  try {
-    return fs.readFileSync("wallets.txt", "utf-8").split("\n").map((wallet) => wallet.trim()).filter(Boolean);
-  } catch {
-    console.error(chalk.red("⚠️ Error: wallets.txt not found"));
-    return [];
-  }
 }
 
 function createAxiosInstance(proxyUrl = null) {
@@ -104,17 +80,13 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
       } catch (error) {
         if (error.response && [502, 504].includes(error.response.status)) {
           console.log(chalk.yellow(`⚠️ Received ${error.response.status} error. Retrying... (${attempts + 1}/${maxAttempts})`));
-          await sleep(3000);
-          attempts++;
-          continue;
         } else if (error.code === 'ECONNABORTED') {
           console.log(chalk.yellow(`⚠️ Request timed out. Retrying... (${attempts + 1}/${maxAttempts})`));
-          await sleep(3000);
-          attempts++;
-          continue;
         } else {
           throw error;
         }
+        attempts++;
+        await sleep(3000);
       }
     }
 
@@ -124,20 +96,21 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
       console.log(chalk.green(`[${timestamp}] ✅ Message sent successfully`));
       console.log(chalk.yellow(`⏳ Request time: ${(endTime - startTime) / 1000}s`));
     } else {
-      console.log(chalk.red(`❌ Failed after ${maxAttempts} attempts.`));
+      console.log(chalk.red(`❌ Failed after ${maxAttempts} attempts. Moving to next message...`));
     }
-
-    await sleep(1000);
-
   } catch (error) {
     console.error(chalk.red("⚠️ Error sending message:"), error);
   }
+  await sleep(1000); // Ensure a delay before the next message
 };
 
 const main = async ({ wallet, innerAxios }) => {
   const limit = plimit(1);
-  const tasks = agents.map((item) => limit(() => sendMessage({ item, wallet_address: wallet, innerAxios })));
-  await Promise.all(tasks);
+  while (true) { // Ensure continuous execution
+    for (const item of agents) {
+      await sendMessage({ item, wallet_address: wallet, innerAxios });
+    }
+  }
 };
 
 const index = async () => {
