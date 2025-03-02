@@ -32,6 +32,23 @@ const questions = [
   "Why is it important to regulate AI in autonomous robots?",
   "How does AI influence the future of energy efficiency?",
   "What are the benefits of using AI in building energy management?",
+  "How can AI optimize water resource management?",
+  "What are the ethical concerns of AI in environmental monitoring?",
+  "How can AI help predict and mitigate wildfires?",
+  "What role does AI play in reducing carbon emissions?",
+  "How can AI assist in optimizing waste management?",
+  "What are the limitations of AI in predicting climate patterns?",
+  "How does AI contribute to biodiversity conservation?",
+  "What are the advantages of AI-powered weather forecasting?",
+  "How can AI improve the efficiency of public transportation?",
+  "What are the risks of deep learning in autonomous decision-making?",
+  "How can AI-driven automation impact job markets?",
+  "What role does AI play in precision agriculture?",
+  "How can AI contribute to smart city development?",
+  "How does AI enhance supply chain sustainability?",
+  "What are the benefits of using AI in predictive maintenance?",
+  "How can AI-driven robots improve disaster response?",
+  "How does AI facilitate energy demand forecasting?"
 ];
 
 function getRandomQuestion() {
