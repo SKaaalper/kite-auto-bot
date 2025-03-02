@@ -25,7 +25,7 @@ const readline = createInterface({
 
 function showBanner() {
   console.log(`\n==========================================`);
-  console.log(`=             Stork Auto Bot             =`);
+  console.log(`=            Kite Ai Auto Bot            =`);
   console.log(`=                                        =`);
   console.log(`=               Batang Eds               =`);
   console.log(`==========================================\n`);
