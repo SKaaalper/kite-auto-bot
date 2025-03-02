@@ -24,11 +24,11 @@ const readline = createInterface({
 });
 
 function showBanner() {
-  console.log(`\n==========================================`);
-  console.log(`=            Kite Ai Auto Bot            =`);
-  console.log(`=                                        =`);
-  console.log(`=               Batang Eds               =`);
-  console.log(`==========================================\n`);
+  console.log(chalk.blue(`\n==========================================`));
+  console.log(chalk.green(`=            Kite Ai Auto Bot            =`));
+  console.log(chalk.red(`=                                        =`));
+  console.log(chalk.yellow(`=               Batang Eds               =`));
+  console.log(chalk.blue(`==========================================\n`));
 }
 
 const proxyConfig = {
@@ -59,6 +59,10 @@ const retry = async (fn, { maxAttempts, delay }) => {
     }
   }
 };
+
+function getCurrentTimestamp() {
+  return new Date().toLocaleString();
+}
 
 function loadWalletsFromFile() {
   try {
@@ -91,10 +95,12 @@ function createAxiosInstance(proxyUrl = null) {
 const sendMessage = async ({ item, wallet_address, innerAxios }) => {
   try {
     const message = getRandomQuestion() || generate({ maxLength: 6 });
-    console.log("Sending message:", message);
+    const timestamp = getCurrentTimestamp();
+    console.log(chalk.cyan(`[${timestamp}] Sending message:`), message);
+    
     const response = await innerAxios.post(item.url, { message, stream: true });
     if (response.status === 200) {
-      console.log(chalk.green("✅ Message sent successfully"));
+      console.log(chalk.green(`[${timestamp}] ✅ Message sent successfully`));
     }
     await sleep(1000); // Add fixed interval of 1 second between messages
   } catch (error) {
