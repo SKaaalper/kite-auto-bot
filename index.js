@@ -46,6 +46,33 @@ const saveTotalInteractions = () => {
   fs.writeFileSync(logFilePath, JSON.stringify({ totalInteractions }, null, 2));
 };
 
+// Function to update dashboard stats
+const updateDashboard = async (wallet, totalInteractions, totalPoints, innerAxios) => {
+  try {
+    const response = await innerAxios.post("https://api.zettablock.com/update-stats", {
+      wallet: wallet,
+      total_interactions: totalInteractions,
+      total_points: totalPoints,
+    });
+
+    console.log("📤 Sending update:", {
+      wallet: wallet,
+      total_interactions: totalInteractions,
+      total_points: totalPoints,
+    });
+
+    console.log("📥 API Response:", response.data);
+
+    if (response.status === 200) {
+      console.log(chalk.green("✅ Successfully updated dashboard!"));
+    } else {
+      console.log(chalk.red("⚠️ Failed to update dashboard. Check API response."));
+    }
+  } catch (error) {
+    console.log(chalk.red("⚠️ Error updating dashboard:", error.message));
+  }
+};
+
 function showBanner() {
   console.log(chalk.blue(`\n==========================================`));
   console.log(chalk.green(`=            Kite Ai Auto Bot            =`));
@@ -110,14 +137,17 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
     const endTime = Date.now();
 
     if (response && response.status === 200) {
-      totalInteractions++;  // Increment total interactions only if successful
-      saveTotalInteractions();  // Save updated total interactions
+      totalInteractions++;
+      saveTotalInteractions();
 
       totalPoints += Math.floor(Math.random() * 10) + 1;
-      
+
       console.log(chalk.green(`[${timestamp}] ✅ Message sent successfully`));
       console.log(chalk.yellow(`⏳ Request time: ${(endTime - startTime) / 1000}s`));
       console.log(chalk.blue(`📊 Total Interactions: ${totalInteractions} | Total Points Earned: ${totalPoints}`));
+
+      // 🔄 Update the dashboard API
+      await updateDashboard(wallet_address, totalInteractions, totalPoints, innerAxios);
     } else {
       console.log(chalk.red(`❌ Failed after ${maxAttempts} attempts. Moving to next message...`));
     }
