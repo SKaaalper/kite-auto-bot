@@ -73,19 +73,10 @@ function loadWalletsFromFile() {
   }
 }
 
-function loadProxiesFromFile() {
-  try {
-    proxyConfig.proxies = fs.readFileSync("proxies.txt", "utf-8").split("\n").map((proxy) => proxy.trim()).filter(Boolean);
-    console.log(chalk.green(`✅ Successfully loaded ${proxyConfig.proxies.length} proxies from file`));
-  } catch {
-    console.log(chalk.yellow("⚠️ proxies.txt not found or empty. Using direct connection."));
-  }
-}
-
 function createAxiosInstance(proxyUrl = null) {
   const config = { 
     headers: { "Content-Type": "application/json" },
-    timeout: 10000 // 10s timeout to avoid hanging requests
+    timeout: 15000 // 15s timeout to avoid hanging requests
   };
   if (proxyUrl) {
     const proxyAgent = new HttpsProxyAgent(proxyUrl);
@@ -111,9 +102,14 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
         response = await innerAxios.post(item.url, { message, stream: true });
         if (response.status === 200) break;
       } catch (error) {
-        if (error.response && error.response.status === 502) {
-          console.log(chalk.yellow(`⚠️ Received 502 error. Retrying... (${attempts + 1}/${maxAttempts})`));
-          await sleep(2000);
+        if (error.response && [502, 504].includes(error.response.status)) {
+          console.log(chalk.yellow(`⚠️ Received ${error.response.status} error. Retrying... (${attempts + 1}/${maxAttempts})`));
+          await sleep(3000);
+          attempts++;
+          continue;
+        } else if (error.code === 'ECONNABORTED') {
+          console.log(chalk.yellow(`⚠️ Request timed out. Retrying... (${attempts + 1}/${maxAttempts})`));
+          await sleep(3000);
           attempts++;
           continue;
         } else {
