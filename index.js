@@ -23,6 +23,9 @@ const readline = createInterface({
   output: process.stdout,
 });
 
+let totalInteractions = 0;
+let totalPoints = 0;
+
 function showBanner() {
   console.log(chalk.blue(`\n==========================================`));
   console.log(chalk.green(`=            Kite Ai Auto Bot            =`));
@@ -52,7 +55,7 @@ function getCurrentTimestamp() {
 function createAxiosInstance(proxyUrl = null) {
   const config = { 
     headers: { "Content-Type": "application/json" },
-    timeout: 15000 // 15s timeout to avoid hanging requests
+    timeout: 15000 
   };
   if (proxyUrl) {
     const proxyAgent = new HttpsProxyAgent(proxyUrl);
@@ -61,6 +64,18 @@ function createAxiosInstance(proxyUrl = null) {
   }
   return axios.create(config);
 }
+
+const fetchUserStats = async (wallet_address, innerAxios) => {
+  try {
+    const response = await innerAxios.get(`https://api.zettablock.com/user-stats?wallet=${wallet_address}`);
+    if (response.status === 200 && response.data) {
+      totalInteractions = response.data.total_interactions;
+      totalPoints = response.data.total_points;
+    }
+  } catch (error) {
+    console.log(chalk.red("⚠️ Error fetching user stats. Continuing..."));
+  }
+};
 
 const sendMessage = async ({ item, wallet_address, innerAxios }) => {
   try {
@@ -93,20 +108,24 @@ const sendMessage = async ({ item, wallet_address, innerAxios }) => {
     const endTime = Date.now();
 
     if (response && response.status === 200) {
+      totalInteractions++;
+      totalPoints += Math.floor(Math.random() * 10) + 1;
       console.log(chalk.green(`[${timestamp}] ✅ Message sent successfully`));
       console.log(chalk.yellow(`⏳ Request time: ${(endTime - startTime) / 1000}s`));
+      console.log(chalk.blue(`📊 Total Interactions: ${totalInteractions} | Total Points Earned: ${totalPoints}`));
     } else {
       console.log(chalk.red(`❌ Failed after ${maxAttempts} attempts. Moving to next message...`));
     }
   } catch (error) {
     console.error(chalk.red("⚠️ Error sending message:"), error);
   }
-  await sleep(1000); // Ensure a delay before the next message
+  await sleep(1000);
 };
 
 const main = async ({ wallet, innerAxios }) => {
+  await fetchUserStats(wallet, innerAxios);
   const limit = plimit(1);
-  while (true) { // Ensure continuous execution
+  while (true) {
     for (const item of agents) {
       await sendMessage({ item, wallet_address: wallet, innerAxios });
     }
